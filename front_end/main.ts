@@ -1,3 +1,51 @@
+function insertCanvas() {
+    let s: string[] = [];
+    s.push(`<canvas id="myCanvas" width="1000" height="500" style="border:1px solid #cccccc;">`);
+    s.push(`</canvas>`);
+    const content = document.getElementById('content');
+    if (content) { // Check if content is not null
+        content.innerHTML = s.join('');
+    } else {
+        console.error('Element with id "content" not found');
+    }
+}
+
+function insertIntro() {
+    let s: string[] = [];
+    s.push(`<h1>Banana Quest: The Potassium Crisis</h1>`);
+    s.push(`<p>In a land known as "Fruitopia," the inhabitants thrived on the delicious and nutritious fruits that grew abundantly. 
+	One fruit, in particular, was highly treasured - the mighty banana. 
+	Fruitopia's inhabitants had always enjoyed the health benefits and energy provided by this potassium-rich treat, 
+	which fueled their daily adventures and brought joy to their lives.
+	
+	But one day, a mysterious phenomenon occurred: the banana crops across Fruitopia began to wither, 
+	and the supply of this essential fruit dwindled rapidly.
+	As the days passed, the once energetic and lively inhabitants of Fruitopia started to feel weak and fatigued. 
+	The doctors and scientists of the land quickly identified the cause - a severe potassium deficiency was spreading among the residents, 
+	and it threatened to plunge Fruitopia into a state of perpetual lethargy.
+	Desperate to restore the health and vitality of their beloved land, 
+	the citizens of Fruitopia are turning to you to help them find 20 bananas.
+	The fate of Fruitopia hangs in the balance.
+	
+	tl;dr: Find 20 bananas to win.
+	
+	If you are willing to undertake this noble quest, please enter your name:</p>`);
+    s.push(`<form id="startForm">`);
+    s.push(`<label for="name">Enter your name:</label><br>`);
+    s.push(`<input type="text" id="name" name="name"><br>`);
+    s.push(`<button id="startButton">Start your adventure</button>`);
+    const content = document.getElementById('content');
+    if (content) {
+        content.innerHTML = s.join('');
+    } else {
+        console.error('Element with id "content" not found');
+    }
+
+	document.getElementById('startButton')?.addEventListener('click', startGame);
+}
+
+insertIntro();
+
 class Sprite {
 	x: number;
 	y: number;
@@ -257,9 +305,13 @@ class Game {
 	}
 }
 
-
-let game = new Game();
-let timer = setInterval(() => { game.onTimer(); }, 40);
+function startGame() {
+    let playerName = (document.getElementById('name') as HTMLInputElement).value;
+    insertCanvas();
+    console.log(`Starting game for ${playerName}...`);
+    let game = new Game();
+    let timer = setInterval(() => { game.onTimer(); }, 40);
+}
 
 interface HttpPostCallback {
 	(x:any): any;

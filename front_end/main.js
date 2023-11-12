@@ -8,6 +8,37 @@ var __spreadArray = (this && this.__spreadArray) || function (to, from, pack) {
     }
     return to.concat(ar || Array.prototype.slice.call(from));
 };
+function insertCanvas() {
+    var s = [];
+    s.push("<canvas id=\"myCanvas\" width=\"1000\" height=\"500\" style=\"border:1px solid #cccccc;\">");
+    s.push("</canvas>");
+    var content = document.getElementById('content');
+    if (content) { // Check if content is not null
+        content.innerHTML = s.join('');
+    }
+    else {
+        console.error('Element with id "content" not found');
+    }
+}
+function insertIntro() {
+    var _a;
+    var s = [];
+    s.push("<h1>Banana Quest: The Potassium Crisis</h1>");
+    s.push("<p>In a land known as \"Fruitopia,\" the inhabitants thrived on the delicious and nutritious fruits that grew abundantly. \n\tOne fruit, in particular, was highly treasured - the mighty banana. \n\tFruitopia's inhabitants had always enjoyed the health benefits and energy provided by this potassium-rich treat, \n\twhich fueled their daily adventures and brought joy to their lives.\n\t\n\tBut one day, a mysterious phenomenon occurred: the banana crops across Fruitopia began to wither, \n\tand the supply of this essential fruit dwindled rapidly.\n\tAs the days passed, the once energetic and lively inhabitants of Fruitopia started to feel weak and fatigued. \n\tThe doctors and scientists of the land quickly identified the cause - a severe potassium deficiency was spreading among the residents, \n\tand it threatened to plunge Fruitopia into a state of perpetual lethargy.\n\tDesperate to restore the health and vitality of their beloved land, \n\tthe citizens of Fruitopia are turning to you to help them find 20 bananas.\n\tThe fate of Fruitopia hangs in the balance.\n\t\n\ttl;dr: Find 20 bananas to win.\n\t\n\tIf you are willing to undertake this noble quest, please enter your name:</p>");
+    s.push("<form id=\"startForm\">");
+    s.push("<label for=\"name\">Enter your name:</label><br>");
+    s.push("<input type=\"text\" id=\"name\" name=\"name\"><br>");
+    s.push("<button id=\"startButton\">Start your adventure</button>");
+    var content = document.getElementById('content');
+    if (content) {
+        content.innerHTML = s.join('');
+    }
+    else {
+        console.error('Element with id "content" not found');
+    }
+    (_a = document.getElementById('startButton')) === null || _a === void 0 ? void 0 : _a.addEventListener('click', startGame);
+}
+insertIntro();
 var Sprite = /** @class */ (function () {
     function Sprite(x, y, id, image_url, update_method, onclick_method) {
         this.x = x;
@@ -178,6 +209,7 @@ var Controller = /** @class */ (function () {
             var update_id = update[0];
             var update_x = update[1];
             var update_y = update[2];
+            // if the incoming id is my id, continue
             if (update_id == g_id) {
                 continue;
             }
@@ -192,7 +224,9 @@ var Controller = /** @class */ (function () {
                     break;
                 }
             }
-            //if there isn't one make one
+            //if no matching sprites, make a new one and make it so
+            // that it can move but it can't be moved by my mouse
+            // also make it green
             if (!found) {
                 var newSprite = new Sprite(update_x, update_y, update_id, "green_robot.png", Sprite.prototype.go_toward_destination, Sprite.prototype.ignore_click);
                 this.model.sprites.push(newSprite);
@@ -225,8 +259,13 @@ var Game = /** @class */ (function () {
     };
     return Game;
 }());
-var game = new Game();
-var timer = setInterval(function () { game.onTimer(); }, 40);
+function startGame() {
+    var playerName = document.getElementById('name').value;
+    insertCanvas();
+    console.log("Starting game for ".concat(playerName, "..."));
+    var game = new Game();
+    var timer = setInterval(function () { game.onTimer(); }, 40);
+}
 var random_id = function (len) {
     var p = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
     return __spreadArray([], Array(len), true).reduce(function (a) { return a + p[Math.floor(Math.random() * p.length)]; }, '');
