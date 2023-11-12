@@ -1,3 +1,5 @@
+let playerName: string;
+
 function insertCanvas() {
     let s: string[] = [];
     s.push(`<canvas id="myCanvas" width="1000" height="500" style="border:1px solid #cccccc;">`);
@@ -33,7 +35,9 @@ function insertIntro() {
     s.push(`<form id="startForm">`);
     s.push(`<label for="name">Enter your name:</label><br>`);
     s.push(`<input type="text" id="name" name="name"><br>`);
-    s.push(`<button id="startButton">Start your adventure</button>`);
+    let playerName = document.getElementById('name');
+
+	s.push(`<button id="startButton">Start your adventure</button>`);
     const content = document.getElementById('content');
     if (content) {
         content.innerHTML = s.join('');
@@ -47,6 +51,7 @@ function insertIntro() {
 insertIntro();
 
 class Sprite {
+	name: string;
 	x: number;
 	y: number;
 	id: string;
@@ -59,7 +64,8 @@ class Sprite {
 	onclick: (x: number, y: number) => void;
 	
 	
-	constructor(x: number, y: number,id: string, image_url: string, update_method: () => void, onclick_method: (x: number, y: number) => void) {
+	constructor(name: string, x: number, y: number,id: string, image_url: string, update_method: () => void, onclick_method: (x: number, y: number) => void) {
+		this.name = name;
 		this.x = x;
 		this.y = y;
 		this.id = id;
@@ -68,6 +74,7 @@ class Sprite {
 		this.image.src = image_url;
 		this.update = update_method;
 		this.onclick = onclick_method;
+
 	}
 
 	set_destination(x: number, y: number) {
@@ -109,7 +116,7 @@ class Model {
 	constructor() {
 		this.sprites = [];
 		//this.sprites.push(new Sprite(200, 100, "lettuce.png", Sprite.prototype.sit_still, Sprite.prototype.ignore_click));
-		this.turtle = new Sprite(50, 50, g_id, "blue_robot.png", Sprite.prototype.go_toward_destination, Sprite.prototype.set_destination);
+		this.turtle = new Sprite(playerName, 50, 50, g_id, "blue_robot.png", Sprite.prototype.go_toward_destination, Sprite.prototype.set_destination);
 		this.sprites.push(this.turtle);
 	}
 
@@ -153,6 +160,9 @@ class View
 			ctx.clearRect(0, 0, 1000, 500);
 			for (const sprite of this.model.sprites) {
 				ctx.drawImage(sprite.image, sprite.x - sprite.image.width / 2, sprite.y - sprite.image.height);
+			
+				ctx.font = "20px Monocraft";
+				ctx.fillText(sprite.name, sprite.x - sprite.image.width / 2, sprite.y - sprite.image.height - 10);
 			}
 		}
 	}
@@ -197,6 +207,7 @@ class Controller
 			action: 'move',
 			x: x,
 			y: y,
+			name: name,
 		}, 
 		
 		this.onAcknowledgeClick);
@@ -245,8 +256,9 @@ class Controller
 			//extract objects from updates
 			let update = ob.updates[i];
 			let update_id = update[0];
-			let update_x = update[1];
-			let update_y = update[2];
+			let update_name = update[1];
+			let update_x = update[2];
+			let update_y = update[3];
 			// if the incoming id is my id, continue
 			if (update_id == g_id) {
 				continue
@@ -266,7 +278,7 @@ class Controller
 			// that it can move but it can't be moved by my mouse
 			// also make it green
 			if (!found) {
-				let newSprite = new Sprite(update_x, update_y, update_id, "green_robot.png", Sprite.prototype.go_toward_destination, Sprite.prototype.ignore_click);
+				let newSprite = new Sprite(update_name, update_x, update_y, update_id, "green_robot.png", Sprite.prototype.go_toward_destination, Sprite.prototype.ignore_click);
 				this.model.sprites.push(newSprite);
 
 			}
@@ -275,7 +287,7 @@ class Controller
 
 	requestUpdates() {
 		let payload = {
-			action: 'iwantupdates',
+			action: "update",
 			id: g_id,
 		};
 
@@ -306,7 +318,7 @@ class Game {
 }
 
 function startGame() {
-    let playerName = (document.getElementById('name') as HTMLInputElement).value;
+	playerName = (document.getElementById('name') as HTMLInputElement).value;
     insertCanvas();
     console.log(`Starting game for ${playerName}...`);
     let game = new Game();

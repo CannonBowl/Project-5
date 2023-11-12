@@ -8,6 +8,7 @@ var __spreadArray = (this && this.__spreadArray) || function (to, from, pack) {
     }
     return to.concat(ar || Array.prototype.slice.call(from));
 };
+var playerName;
 function insertCanvas() {
     var s = [];
     s.push("<canvas id=\"myCanvas\" width=\"1000\" height=\"500\" style=\"border:1px solid #cccccc;\">");
@@ -28,6 +29,7 @@ function insertIntro() {
     s.push("<form id=\"startForm\">");
     s.push("<label for=\"name\">Enter your name:</label><br>");
     s.push("<input type=\"text\" id=\"name\" name=\"name\"><br>");
+    var playerName = document.getElementById('name');
     s.push("<button id=\"startButton\">Start your adventure</button>");
     var content = document.getElementById('content');
     if (content) {
@@ -40,7 +42,8 @@ function insertIntro() {
 }
 insertIntro();
 var Sprite = /** @class */ (function () {
-    function Sprite(x, y, id, image_url, update_method, onclick_method) {
+    function Sprite(name, x, y, id, image_url, update_method, onclick_method) {
+        this.name = name;
         this.x = x;
         this.y = y;
         this.id = id;
@@ -83,7 +86,7 @@ var Model = /** @class */ (function () {
     function Model() {
         this.sprites = [];
         //this.sprites.push(new Sprite(200, 100, "lettuce.png", Sprite.prototype.sit_still, Sprite.prototype.ignore_click));
-        this.turtle = new Sprite(50, 50, g_id, "blue_robot.png", Sprite.prototype.go_toward_destination, Sprite.prototype.set_destination);
+        this.turtle = new Sprite(playerName, 50, 50, g_id, "blue_robot.png", Sprite.prototype.go_toward_destination, Sprite.prototype.set_destination);
         this.sprites.push(this.turtle);
     }
     Model.prototype.update = function () {
@@ -120,6 +123,8 @@ var View = /** @class */ (function () {
             for (var _i = 0, _a = this.model.sprites; _i < _a.length; _i++) {
                 var sprite = _a[_i];
                 ctx.drawImage(sprite.image, sprite.x - sprite.image.width / 2, sprite.y - sprite.image.height);
+                ctx.font = "20px Monocraft";
+                ctx.fillText(sprite.name, sprite.x - sprite.image.width / 2, sprite.y - sprite.image.height - 10);
             }
         }
     };
@@ -156,6 +161,7 @@ var Controller = /** @class */ (function () {
             action: 'move',
             x: x,
             y: y,
+            name: name,
         }, this.onAcknowledgeClick);
     };
     Controller.prototype.onAcknowledgeClick = function (ob) {
@@ -207,8 +213,9 @@ var Controller = /** @class */ (function () {
             //extract objects from updates
             var update = ob.updates[i];
             var update_id = update[0];
-            var update_x = update[1];
-            var update_y = update[2];
+            var update_name = update[1];
+            var update_x = update[2];
+            var update_y = update[3];
             // if the incoming id is my id, continue
             if (update_id == g_id) {
                 continue;
@@ -228,7 +235,7 @@ var Controller = /** @class */ (function () {
             // that it can move but it can't be moved by my mouse
             // also make it green
             if (!found) {
-                var newSprite = new Sprite(update_x, update_y, update_id, "green_robot.png", Sprite.prototype.go_toward_destination, Sprite.prototype.ignore_click);
+                var newSprite = new Sprite(update_name, update_x, update_y, update_id, "green_robot.png", Sprite.prototype.go_toward_destination, Sprite.prototype.ignore_click);
                 this.model.sprites.push(newSprite);
             }
         }
@@ -236,7 +243,7 @@ var Controller = /** @class */ (function () {
     Controller.prototype.requestUpdates = function () {
         var _this = this;
         var payload = {
-            action: 'iwantupdates',
+            action: "update",
             id: g_id,
         };
         httpPost('ajax.html', payload, function (ob) { return _this.on_receive_updates(ob); });
@@ -260,7 +267,7 @@ var Game = /** @class */ (function () {
     return Game;
 }());
 function startGame() {
-    var playerName = document.getElementById('name').value;
+    playerName = document.getElementById('name').value;
     insertCanvas();
     console.log("Starting game for ".concat(playerName, "..."));
     var game = new Game();
