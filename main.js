@@ -9,6 +9,18 @@ var __spreadArray = (this && this.__spreadArray) || function (to, from, pack) {
     return to.concat(ar || Array.prototype.slice.call(from));
 };
 var playerName;
+var thing_names = [
+    "chair",
+    "lamp",
+    "mushroom",
+    "outhouse",
+    "pillar",
+    "pond",
+    "rock",
+    "statue",
+    "tree",
+    "turtle",
+];
 function insertCanvas() {
     var s = [];
     s.push("<canvas id=\"myCanvas\" width=\"1000\" height=\"500\" style=\"border:1px solid #cccccc;\">");
@@ -29,7 +41,8 @@ function insertIntro() {
     s.push("<form id=\"startForm\">");
     s.push("<label for=\"name\">Enter your name:</label><br>");
     s.push("<input type=\"text\" id=\"name\" name=\"name\"><br>");
-    var playerName = document.getElementById('name');
+    var nameInput = document.getElementById('name');
+    playerName = (nameInput === null || nameInput === void 0 ? void 0 : nameInput.value) || 'Player';
     s.push("<button id=\"startButton\">Start your adventure</button>");
     var content = document.getElementById('content');
     if (content) {
@@ -41,13 +54,31 @@ function insertIntro() {
     (_a = document.getElementById('startButton')) === null || _a === void 0 ? void 0 : _a.addEventListener('click', startGame);
 }
 insertIntro();
+//=============================================================
+//                       CLASS BREAK
+//=============================================================
+var Features = /** @class */ (function () {
+    function Features(kind, x, y) {
+        this.kind = kind;
+        this.x = x;
+        this.y = y;
+        this.image = new Image();
+        this.image.src = "".concat(thing_names[kind], ".png");
+    }
+    Features.prototype.update = function () {
+    };
+    return Features;
+}());
+//=============================================================
+//					   CLASS BREAK
+//=============================================================
 var Sprite = /** @class */ (function () {
     function Sprite(name, x, y, id, image_url, update_method, onclick_method) {
         this.name = name;
         this.x = x;
         this.y = y;
         this.id = id;
-        this.speed = 16;
+        this.speed = 4;
         this.image = new Image();
         this.image.src = image_url;
         this.update = update_method;
@@ -79,16 +110,30 @@ var Sprite = /** @class */ (function () {
     };
     return Sprite;
 }());
+var center_x = 500;
+var center_y = 270;
+var scroll_rate = 0.03;
 //=============================================================
 //                       CLASS BREAK
 //=============================================================
 var Model = /** @class */ (function () {
     function Model() {
+        this.features = [];
+        this.global_scroll_x = 0;
+        this.global_scroll_y = 0;
         this.sprites = [];
-        //this.sprites.push(new Sprite(200, 100, "lettuce.png", Sprite.prototype.sit_still, Sprite.prototype.ignore_click));
         this.turtle = new Sprite(playerName, 50, 50, g_id, "blue_robot.png", Sprite.prototype.go_toward_destination, Sprite.prototype.set_destination);
         this.sprites.push(this.turtle);
+        this.features = [];
+        this.global_scroll_x += scroll_rate * (this.turtle.x - this.global_scroll_x - center_x);
+        this.global_scroll_y += scroll_rate * (this.turtle.y - this.global_scroll_y - center_y);
     }
+    Model.prototype.addFeature = function (kind, x, y) {
+        var image = new Image();
+        image.src = "".concat(thing_names[kind], ".png");
+        var newFeature = new Features(kind, x, y);
+        this.features.push(newFeature);
+    };
     Model.prototype.update = function () {
         for (var _i = 0, _a = this.sprites; _i < _a.length; _i++) {
             var sprite = _a[_i];
@@ -111,10 +156,20 @@ var Model = /** @class */ (function () {
 //=============================================================
 var View = /** @class */ (function () {
     function View(model) {
+        this.featureImages = [];
+        this.global_scroll_x = 0;
+        this.g_croll_scroll_y = 0;
         this.model = model;
         this.canvas = document.getElementById("myCanvas");
         this.turtle = new Image();
         this.turtle.src = "blue_robot.png";
+        this.featureImages = [];
+        for (var i = 0; i < thing_names.length; i++) {
+            var image = new Image();
+            image.src = "".concat(thing_names[i], ".png");
+            this.featureImages.push(image);
+        }
+        this.get_map();
     }
     View.prototype.update = function () {
         var ctx = this.canvas.getContext("2d");
@@ -127,6 +182,16 @@ var View = /** @class */ (function () {
                 ctx.fillText(sprite.name, sprite.x - sprite.image.width / 2, sprite.y - sprite.image.height - 10);
             }
         }
+    };
+    View.prototype.get_map = function () {
+        var _this = this;
+        var payload = {
+            action: "get_map",
+        };
+        httpPost('ajax.html', payload, function (ob) { return _this.mapReceived(ob); });
+    };
+    View.prototype.mapReceived = function (response) {
+        console.log("Response to get_map: ".concat(response));
     };
     return View;
 }());
@@ -157,11 +222,11 @@ var Controller = /** @class */ (function () {
         var y = event.pageY - this.view.canvas.offsetTop;
         this.model.onclick(x, y);
         httpPost('ajax.html', {
-            id: g_id,
             action: 'move',
+            id: g_id,
+            name: playerName,
             x: x,
             y: y,
-            name: name,
         }, this.onAcknowledgeClick);
     };
     Controller.prototype.onAcknowledgeClick = function (ob) {
@@ -209,6 +274,10 @@ var Controller = /** @class */ (function () {
         }
     };
     Controller.prototype.on_receive_updates = function (ob) {
+        if (!ob || !ob.updates) {
+            console.error('Invalid updates object received', ob);
+            return;
+        }
         for (var i = 0; i < ob.updates.length; i++) {
             //extract objects from updates
             var update = ob.updates[i];
@@ -248,6 +317,21 @@ var Controller = /** @class */ (function () {
         };
         httpPost('ajax.html', payload, function (ob) { return _this.on_receive_updates(ob); });
     };
+    Controller.prototype.onReceiveMap = function (ob) {
+        if (ob.status === 'map') {
+            console.log("Received map: ".concat(JSON.stringify(ob)));
+            for (var i = 1; i < ob.map.things.length; i++) {
+                var object = ob.map.things[i];
+                var objectKind = object.kind;
+                var objectX = object.x;
+                var objectY = object.y;
+                this.model.addFeature(objectKind, objectX, objectY);
+            }
+        }
+        else {
+            console.error("Received invalid response: ".concat(JSON.stringify(ob)));
+        }
+    };
     return Controller;
 }());
 //=============================================================
@@ -267,7 +351,16 @@ var Game = /** @class */ (function () {
     return Game;
 }());
 function startGame() {
+    var _this = this;
     playerName = document.getElementById('name').value;
+    if (!playerName) {
+        console.error('Player name is null or empty');
+        return;
+    }
+    // request map from server
+    httpPost('ajax.html', {
+        action: 'get_map',
+    }, function (ob) { return _this.controller.onReceiveMap.call(_this.controller, ob); });
     insertCanvas();
     console.log("Starting game for ".concat(playerName, "..."));
     var game = new Game();
@@ -277,7 +370,8 @@ var random_id = function (len) {
     var p = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
     return __spreadArray([], Array(len), true).reduce(function (a) { return a + p[Math.floor(Math.random() * p.length)]; }, '');
 };
-var g_origin = new URL(window.location.href).origin;
+//const g_origin = new URL(window.location.href).origin;
+var g_origin = 'http://jacquard.ddns.uark.edu:8080';
 var g_id = random_id(12);
 // Payload is a marshaled (but not JSON-stringified) object
 // A JSON-parsed response object will be passed to the callback

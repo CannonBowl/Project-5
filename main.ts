@@ -1,5 +1,18 @@
 let playerName: string;
 
+const thing_names = [
+	"chair", // 0
+	"lamp",
+	"mushroom", // 2
+	"outhouse",
+	"pillar", // 4
+	"pond",
+	"rock", // 6
+	"statue",
+	"tree", // 8
+	"turtle",
+];
+
 function insertCanvas() {
     let s: string[] = [];
     s.push(`<canvas id="myCanvas" width="1000" height="500" style="border:1px solid #cccccc;">`);
@@ -35,7 +48,8 @@ function insertIntro() {
     s.push(`<form id="startForm">`);
     s.push(`<label for="name">Enter your name:</label><br>`);
     s.push(`<input type="text" id="name" name="name"><br>`);
-    let playerName = document.getElementById('name');
+    let nameInput = document.getElementById('name');
+	playerName = (nameInput as HTMLInputElement)?.value || 'Player';
 
 	s.push(`<button id="startButton">Start your adventure</button>`);
     const content = document.getElementById('content');
@@ -49,6 +63,32 @@ function insertIntro() {
 }
 
 insertIntro();
+
+//=============================================================
+//                       CLASS BREAK
+//=============================================================
+class Features {
+	kind: number;
+	x: number;
+	y: number;
+	image: HTMLImageElement;
+
+	constructor(kind: number, x: number, y: number) {
+		this.kind = kind;
+		this.x = x;
+		this.y = y;
+		this.image = new Image();
+		this.image.src = `${thing_names[kind]}.png`;
+	}
+
+	update(){
+
+	}
+}
+
+//=============================================================
+//					   CLASS BREAK
+//=============================================================
 
 class Sprite {
 	name: string;
@@ -69,7 +109,7 @@ class Sprite {
 		this.x = x;
 		this.y = y;
 		this.id = id;
-        this.speed = 16;
+        this.speed = 4;
 		this.image = new Image();
 		this.image.src = image_url;
 		this.update = update_method;
@@ -105,6 +145,10 @@ class Sprite {
 	}
 }
 
+const center_x = 500;
+const center_y = 270;
+const scroll_rate = 0.03;
+
 //=============================================================
 //                       CLASS BREAK
 //=============================================================
@@ -112,12 +156,27 @@ class Sprite {
 class Model {
 	sprites: Sprite[];
 	turtle: Sprite;
+	features: Features[] = [];
+
+	global_scroll_x: number = 0;
+	global_scroll_y: number = 0;
 	
 	constructor() {
 		this.sprites = [];
-		//this.sprites.push(new Sprite(200, 100, "lettuce.png", Sprite.prototype.sit_still, Sprite.prototype.ignore_click));
 		this.turtle = new Sprite(playerName, 50, 50, g_id, "blue_robot.png", Sprite.prototype.go_toward_destination, Sprite.prototype.set_destination);
 		this.sprites.push(this.turtle);
+
+		this.features = [];
+
+		this.global_scroll_x += scroll_rate * (this.turtle.x - this.global_scroll_x - center_x);
+		this.global_scroll_y += scroll_rate * (this.turtle.y - this.global_scroll_y - center_y);
+	}
+
+	addFeature(kind: number, x: number, y: number) {
+		let image = new Image();
+		image.src = `${thing_names[kind]}.png`;
+		let newFeature = new Features(kind, x, y);
+		this.features.push(newFeature);
 	}
 
 	update() {
@@ -146,12 +205,25 @@ class View
 	model: Model;
 	canvas: HTMLCanvasElement;
 	turtle: HTMLImageElement;
+	featureImages: HTMLImageElement[] = [];
+
+	global_scroll_x = 0;
+	g_croll_scroll_y = 0;
 	
 	constructor(model: Model) {
 		this.model = model;
 		this.canvas = document.getElementById("myCanvas") as HTMLCanvasElement;
 		this.turtle = new Image();
 		this.turtle.src = "blue_robot.png";
+
+		this.featureImages = [];
+
+		for (let i = 0; i < thing_names.length; i++) {
+			let image = new Image();
+			image.src = `${thing_names[i]}.png`;
+			this.featureImages.push(image);
+		}
+		this.get_map();
 	}
 
 	update() {
@@ -165,6 +237,20 @@ class View
 				ctx.fillText(sprite.name, sprite.x - sprite.image.width / 2, sprite.y - sprite.image.height - 10);
 			}
 		}
+	}
+
+	get_map() {
+		let payload = {
+			action: "get_map",
+		};
+
+		httpPost('ajax.html', payload, (ob) => this.mapReceived(ob));
+	}
+
+	mapReceived(response: string) {
+		
+		console.log(`Response to get_map: ${response}`);
+
 	}
 }
 
@@ -203,11 +289,11 @@ class Controller
 		this.model.onclick(x, y);
 
 		httpPost('ajax.html', {
-			id: g_id,
 			action: 'move',
+			id: g_id,
+			name: playerName,
 			x: x,
 			y: y,
-			name: name,
 		}, 
 		
 		this.onAcknowledgeClick);
@@ -251,6 +337,10 @@ class Controller
 	}
 
 	on_receive_updates(ob: any) {
+		if (!ob || !ob.updates) {
+			console.error('Invalid updates object received', ob);
+			return;
+		}
 
 		for (let i = 0; i < ob.updates.length; i++) {
 			//extract objects from updates
@@ -293,6 +383,22 @@ class Controller
 
 		httpPost('ajax.html', payload, (ob) => this.on_receive_updates(ob));
 	}
+	
+	onReceiveMap(ob: any) {
+		if (ob.status === 'map') {
+			console.log(`Received map: ${JSON.stringify(ob)}`);
+			for(let i = 1; i < ob.map.things.length; i++) {
+				let object = ob.map.things[i];
+				let objectKind = object.kind;
+				let objectX = object.x;
+				let objectY = object.y;
+
+				this.model.addFeature(objectKind, objectX, objectY);
+			}
+		} else {
+			console.error(`Received invalid response: ${JSON.stringify(ob)}`);
+		}
+	}
 }
 
 //=============================================================
@@ -319,7 +425,18 @@ class Game {
 
 function startGame() {
 	playerName = (document.getElementById('name') as HTMLInputElement).value;
-    insertCanvas();
+    
+	if (!playerName) {
+		console.error('Player name is null or empty');
+		return;
+	}
+
+	// request map from server
+	httpPost('ajax.html', {
+		action: 'get_map',
+	}, (ob) => this.controller.onReceiveMap.call(this.controller, ob as any));
+	
+	insertCanvas();
     console.log(`Starting game for ${playerName}...`);
     let game = new Game();
     let timer = setInterval(() => { game.onTimer(); }, 40);
@@ -334,7 +451,8 @@ const random_id = (len:number) => {
     return [...Array(len)].reduce(a => a + p[Math.floor(Math.random() * p.length)], '');
 }
 
-const g_origin = new URL(window.location.href).origin;
+//const g_origin = new URL(window.location.href).origin;
+const g_origin = 'http://jacquard.ddns.uark.edu:8080';
 const g_id = random_id(12);
 
 // Payload is a marshaled (but not JSON-stringified) object
