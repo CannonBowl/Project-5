@@ -11,9 +11,10 @@ call tsc --strict main.ts
 :: Type-check the back end and run main.py
 echo Type-checking the back end
 ::pushd back_end
-call python main.py --strict --ignore-missing-imports
-echo Running
+::call python main.py --strict --ignore-missing-imports
+::echo Running
 call python main.py
+echo Running
 ::popd
 
 echo Done

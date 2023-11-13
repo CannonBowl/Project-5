@@ -9,6 +9,7 @@ var __spreadArray = (this && this.__spreadArray) || function (to, from, pack) {
     return to.concat(ar || Array.prototype.slice.call(from));
 };
 var playerName;
+var newSprites = [];
 var thing_names = [
     "chair",
     "lamp",
@@ -32,6 +33,9 @@ function insertCanvas() {
     else {
         console.error('Element with id "content" not found');
     }
+    s.push('<br><big><big><b>Gold: <span id="gold">0</span>, Bananas: <span id="bananas">0</span></b></big></big><br>');
+    s.push('<br><select id="chatWindow" size="8" style="width:1000px"></select> <br> <input type="input" id="chatMessage"></input> <button onclick="postChatMessage()">Post</button>');
+    content.innerHTML = s.join('');
 }
 function insertIntro() {
     var _a;
@@ -54,6 +58,104 @@ function insertIntro() {
     (_a = document.getElementById('startButton')) === null || _a === void 0 ? void 0 : _a.addEventListener('click', startGame);
 }
 insertIntro();
+function postChatMessage(event) {
+    var chat = document.getElementById('chatMessage');
+    var message = chat.value;
+    var payload = {
+        action: 'chat',
+        id: g_id,
+        text: message,
+    };
+    httpPost('ajax.html', payload, function (ob) { return onAcknowledgeChat(ob); });
+}
+function onAcknowledgeChat(ob) {
+    if (ob.status === "error") {
+        console.error("Error: ".concat(ob.message));
+        return;
+    }
+    if (ob.status === "chat_received") {
+        console.log("Chat received: ".concat(JSON.stringify(ob)));
+        return;
+    }
+}
+function sendChat(id) {
+    var message = document.getElementById('chatMessage');
+    var payload = {
+        action: 'chat',
+        id: id,
+        text: message.value,
+    };
+    httpPost('ajax.html', payload, function (ob) { return onAcknowledgeChat(ob); });
+}
+function on_receive_updates(ob) {
+    if (!ob || !ob.updates) {
+        console.error('Invalid updates object received', ob);
+        return;
+    }
+    if (ob.status === 'error') {
+        console.error("Error: ".concat(ob.message));
+        return;
+    }
+    // Pull updates out of updates object
+    if (ob.updates.length > 0) {
+        for (var i = 0; i < ob.updates.length; i++) {
+            //extract objects from updates
+            var update = ob.updates[i];
+            var update_id = update["id"];
+            var update_name = update["name"];
+            var update_x = update["x"];
+            var update_y = update["y"];
+            // if the incoming id is my id, continue
+            if (update_id == g_id) {
+                continue;
+            }
+            //find the sprite with id update-id
+            var found = false;
+            for (var _i = 0, newSprites_1 = newSprites; _i < newSprites_1.length; _i++) {
+                var sprite = newSprites_1[_i];
+                if ((sprite.id === update_id)) {
+                    sprite.dest_x = update_x;
+                    sprite.dest_y = update_y;
+                    found = true;
+                    break;
+                }
+            }
+            //if no matching sprites, make a new one and make it so
+            // that it can move but it can't be moved by my mouse
+            // also make it green
+            if (!found) {
+                var newSprite = new Sprite(update_name, update_x, update_y, update_id, "green_robot.png", Sprite.prototype.go_toward_destination, Sprite.prototype.ignore_click);
+                newSprites.push(newSprite);
+            }
+        }
+    }
+    // Pull chats out of updates object
+    var processChats = ob.chats;
+    // If there are chats to process, process them 
+    if (processChats.length > 0) {
+        processChats.forEach(function (chat) {
+            var option = document.createElement("option"); // create an option element for each chat
+            option.value = chat; // set options value and innerHTML to the chat
+            option.innerHTML = chat;
+            document.getElementById("chatWindow").appendChild(option); // append to chat window
+            option.scrollIntoView(); // scroll new chats into view
+        });
+    }
+    ;
+    // Pull gold and bananas out of updates object
+    var gold = ob.gold;
+    var bananas = ob.bananas;
+    // Update gold and bananas
+    document.getElementById("gold").innerHTML = gold;
+    document.getElementById("bananas").innerHTML = bananas;
+}
+function requestUpdates() {
+    var payload = {
+        action: "update",
+        id: g_id,
+    };
+    httpPost('ajax.html', payload, function (ob) { return on_receive_updates(ob); });
+}
 //=============================================================
 //                       CLASS BREAK
 //=============================================================
@@ -65,8 +167,7 @@ var Features = /** @class */ (function () {
         this.image = new Image();
         this.image.src = "".concat(thing_names[kind], ".png");
     }
-    Features.prototype.update = function () {
-    };
+    Features.prototype.update = function () { };
     return Features;
 }());
 //=============================================================
@@ -88,8 +189,7 @@ var Sprite = /** @class */ (function () {
         this.dest_x = x;
         this.dest_y = y;
     };
-    Sprite.prototype.ignore_click = function (x, y) {
-    };
+    Sprite.prototype.ignore_click = function (x, y) { };
     Sprite.prototype.move = function (dx, dy) {
         this.dest_x = this.x + dx;
         this.dest_y = this.y + dy;
@@ -106,27 +206,21 @@ var Sprite = /** @class */ (function () {
         else if (this.y > this.dest_y)
             this.y -= Math.min(this.y - this.dest_y, this.speed);
     };
-    Sprite.prototype.sit_still = function () {
-    };
+    Sprite.prototype.sit_still = function () { };
     return Sprite;
 }());
 var center_x = 500;
 var center_y = 270;
-var scroll_rate = 0.03;
+var scroll_rate = 0.05;
 //=============================================================
 //                       CLASS BREAK
 //=============================================================
 var Model = /** @class */ (function () {
     function Model() {
         this.features = [];
-        this.global_scroll_x = 0;
-        this.global_scroll_y = 0;
-        this.sprites = [];
         this.turtle = new Sprite(playerName, 50, 50, g_id, "blue_robot.png", Sprite.prototype.go_toward_destination, Sprite.prototype.set_destination);
-        this.sprites.push(this.turtle);
+        newSprites.push(this.turtle);
         this.features = [];
-        this.global_scroll_x += scroll_rate * (this.turtle.x - this.global_scroll_x - center_x);
-        this.global_scroll_y += scroll_rate * (this.turtle.y - this.global_scroll_y - center_y);
     }
     Model.prototype.addFeature = function (kind, x, y) {
         var image = new Image();
@@ -135,16 +229,13 @@ var Model = /** @class */ (function () {
         this.features.push(newFeature);
     };
     Model.prototype.update = function () {
-        for (var _i = 0, _a = this.sprites; _i < _a.length; _i++) {
-            var sprite = _a[_i];
+        for (var _i = 0, newSprites_2 = newSprites; _i < newSprites_2.length; _i++) {
+            var sprite = newSprites_2[_i];
             sprite.update();
         }
     };
     Model.prototype.onclick = function (x, y) {
-        for (var _i = 0, _a = this.sprites; _i < _a.length; _i++) {
-            var sprite = _a[_i];
-            sprite.onclick(x, y);
-        }
+        this.turtle.onclick(x, y);
     };
     Model.prototype.move = function (dx, dy) {
         this.turtle.move(dx, dy);
@@ -158,7 +249,7 @@ var View = /** @class */ (function () {
     function View(model) {
         this.featureImages = [];
         this.global_scroll_x = 0;
-        this.g_croll_scroll_y = 0;
+        this.global_scroll_y = 0;
         this.model = model;
         this.canvas = document.getElementById("myCanvas");
         this.turtle = new Image();
@@ -173,13 +264,19 @@ var View = /** @class */ (function () {
     }
     View.prototype.update = function () {
         var ctx = this.canvas.getContext("2d");
+        this.global_scroll_x += scroll_rate * (this.model.turtle.x - this.global_scroll_x - center_x);
+        this.global_scroll_y += scroll_rate * (this.model.turtle.y - this.global_scroll_y - center_y);
         if (ctx) {
             ctx.clearRect(0, 0, 1000, 500);
-            for (var _i = 0, _a = this.model.sprites; _i < _a.length; _i++) {
-                var sprite = _a[_i];
-                ctx.drawImage(sprite.image, sprite.x - sprite.image.width / 2, sprite.y - sprite.image.height);
+            for (var _i = 0, newSprites_3 = newSprites; _i < newSprites_3.length; _i++) {
+                var sprite = newSprites_3[_i];
+                ctx.drawImage(sprite.image, ((sprite.x - sprite.image.width / 2) - this.global_scroll_x), ((sprite.y - sprite.image.height) - this.global_scroll_y));
                 ctx.font = "20px Monocraft";
-                ctx.fillText(sprite.name, sprite.x - sprite.image.width / 2, sprite.y - sprite.image.height - 10);
+                ctx.fillText(sprite.name, ((sprite.x - sprite.image.width / 2) - this.global_scroll_x), ((sprite.y - sprite.image.height - 10) - this.global_scroll_y));
+            }
+            for (var _a = 0, _b = this.model.features; _a < _b.length; _a++) {
+                var feature = _b[_a];
+                ctx.drawImage(feature.image, ((feature.x - feature.image.width / 2) - this.global_scroll_x), ((feature.y - feature.image.height) - this.global_scroll_y));
             }
         }
     };
@@ -190,8 +287,20 @@ var View = /** @class */ (function () {
         };
         httpPost('ajax.html', payload, function (ob) { return _this.mapReceived(ob); });
     };
-    View.prototype.mapReceived = function (response) {
-        console.log("Response to get_map: ".concat(response));
+    View.prototype.mapReceived = function (ob) {
+        if (ob.status === 'error') {
+            console.error("Error: ".concat(ob.message));
+            return;
+        }
+        if (ob.status === 'map') {
+            for (var i = 1; i < ob.map.things.length; i++) {
+                var object = ob.map.things[i];
+                var objectKind = object.kind;
+                var objectX = object.x;
+                var objectY = object.y;
+                this.model.addFeature(objectKind, objectX, objectY);
+            }
+        }
     };
     return View;
 }());
@@ -218,9 +327,10 @@ var Controller = /** @class */ (function () {
         document.addEventListener('keyup', function (event) { self.keyUp(event); }, false);
     }
     Controller.prototype.onClick = function (event) {
-        var x = event.pageX - this.view.canvas.offsetLeft;
-        var y = event.pageY - this.view.canvas.offsetTop;
+        var x = event.pageX - this.view.canvas.offsetLeft + this.view.global_scroll_x;
+        var y = event.pageY - this.view.canvas.offsetTop + this.view.global_scroll_y;
         this.model.onclick(x, y);
+        // Send move request to server
         httpPost('ajax.html', {
             action: 'move',
             id: g_id,
@@ -230,7 +340,14 @@ var Controller = /** @class */ (function () {
         }, this.onAcknowledgeClick);
     };
     Controller.prototype.onAcknowledgeClick = function (ob) {
-        console.log("Response to move: ".concat(JSON.stringify(ob)));
+        if (ob.status === 'error') {
+            console.error("Error: ".concat(ob.message));
+            return;
+        }
+        if (ob.status === 'moved') {
+            console.log("Move received: ".concat(JSON.stringify(ob)));
+            return;
+        }
     };
     Controller.prototype.keyDown = function (event) {
         if (event.keyCode == 39)
@@ -270,66 +387,7 @@ var Controller = /** @class */ (function () {
         var currentTime = Date.now();
         if (currentTime - this.lastUpdatesRequestTime >= this.updateInterval) {
             this.lastUpdatesRequestTime = currentTime;
-            this.requestUpdates();
-        }
-    };
-    Controller.prototype.on_receive_updates = function (ob) {
-        if (!ob || !ob.updates) {
-            console.error('Invalid updates object received', ob);
-            return;
-        }
-        for (var i = 0; i < ob.updates.length; i++) {
-            //extract objects from updates
-            var update = ob.updates[i];
-            var update_id = update[0];
-            var update_name = update[1];
-            var update_x = update[2];
-            var update_y = update[3];
-            // if the incoming id is my id, continue
-            if (update_id == g_id) {
-                continue;
-            }
-            //find the sprite with id update-id
-            var found = false;
-            for (var _i = 0, _a = this.model.sprites; _i < _a.length; _i++) {
-                var sprite = _a[_i];
-                if ((sprite.id === update_id)) {
-                    sprite.dest_x = update_x;
-                    sprite.dest_y = update_y;
-                    found = true;
-                    break;
-                }
-            }
-            //if no matching sprites, make a new one and make it so
-            // that it can move but it can't be moved by my mouse
-            // also make it green
-            if (!found) {
-                var newSprite = new Sprite(update_name, update_x, update_y, update_id, "green_robot.png", Sprite.prototype.go_toward_destination, Sprite.prototype.ignore_click);
-                this.model.sprites.push(newSprite);
-            }
-        }
-    };
-    Controller.prototype.requestUpdates = function () {
-        var _this = this;
-        var payload = {
-            action: "update",
-            id: g_id,
-        };
-        httpPost('ajax.html', payload, function (ob) { return _this.on_receive_updates(ob); });
-    };
-    Controller.prototype.onReceiveMap = function (ob) {
-        if (ob.status === 'map') {
-            console.log("Received map: ".concat(JSON.stringify(ob)));
-            for (var i = 1; i < ob.map.things.length; i++) {
-                var object = ob.map.things[i];
-                var objectKind = object.kind;
-                var objectX = object.x;
-                var objectY = object.y;
-                this.model.addFeature(objectKind, objectX, objectY);
-            }
-        }
-        else {
-            console.error("Received invalid response: ".concat(JSON.stringify(ob)));
+            requestUpdates();
         }
     };
     return Controller;
@@ -351,16 +409,12 @@ var Game = /** @class */ (function () {
     return Game;
 }());
 function startGame() {
-    var _this = this;
     playerName = document.getElementById('name').value;
+    console.log('user entered name: ' + playerName);
     if (!playerName) {
         console.error('Player name is null or empty');
         return;
     }
-    // request map from server
-    httpPost('ajax.html', {
-        action: 'get_map',
-    }, function (ob) { return _this.controller.onReceiveMap.call(_this.controller, ob); });
     insertCanvas();
     console.log("Starting game for ".concat(playerName, "..."));
     var game = new Game();
@@ -370,8 +424,8 @@ var random_id = function (len) {
     var p = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
     return __spreadArray([], Array(len), true).reduce(function (a) { return a + p[Math.floor(Math.random() * p.length)]; }, '');
 };
-//const g_origin = new URL(window.location.href).origin;
-var g_origin = 'http://jacquard.ddns.uark.edu:8080';
+var g_origin = new URL(window.location.href).origin;
+//const g_origin = 'http://jacquard.ddns.uark.edu:8080';
 var g_id = random_id(12);
 // Payload is a marshaled (but not JSON-stringified) object
 // A JSON-parsed response object will be passed to the callback
